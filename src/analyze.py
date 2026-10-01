@@ -1,0 +1,46 @@
+import mlflow
+
+# Connect to the experiment
+experiment = mlflow.get_experiment_by_name("employee-attrition-prediction")
+
+# Search for all completed runs, sorted by F1 score
+runs = mlflow.search_runs(
+    experiment_ids=[experiment.experiment_id],
+    filter_string="status = 'FINISHED'",
+    order_by=["metrics.f1_score DESC"]
+)
+
+# Show the top 5 runs
+print("Top 5 Runs by F1 Score:")
+print("=" * 80)
+for i, row in runs.head(5).iterrows():
+    print(f"\nRun: {row['run_id'][:8]}...")
+    print(f"  Model:    {row['params.model_type']}")
+    print(f"  F1:       {row['metrics.f1_score']:.4f}")
+    print(f"  Accuracy: {row['metrics.accuracy']:.4f}")
+    print(f"  AUC-ROC:  {row['metrics.auc_roc']:.4f}")
+    print(f"  Precision: {row['metrics.precision']:.4f}")
+    print(f"  Recall:    {row['metrics.recall']:.4f}")
+
+# Find the best run
+if not runs.empty:
+    best_run = runs.iloc[0]
+    print("\nBest Run by F1 Score:")
+    print("=" * 80)
+    print(f"Run: {best_run['run_id'][:8]}...")
+    print(f"  Model:    {best_run['params.model_type']}")
+    print(f"  F1:       {best_run['metrics.f1_score']:.4f}")
+    print(f"  Accuracy: {best_run['metrics.accuracy']:.4f}")
+    print(f"  AUC-ROC:  {best_run['metrics.auc_roc']:.4f}")
+    print(f"  Precision: {best_run['metrics.precision']:.4f}")
+    print(f"  Recall:    {best_run['metrics.recall']:.4f}")
+else:
+    print("No completed runs found.")
+
+# Show how metrics vary by model type
+print(f"\n{'=' * 80}")
+print("Average F1 Score by Model Type:")
+print("=" * 80)
+summary = runs.groupby("params.model_type")["metrics.f1_score"].agg(["mean", "max", "count"])
+summary.columns = ["avg_f1", "best_f1", "num_runs"]
+print(summary.sort_values("best_f1", ascending=False).to_string())
