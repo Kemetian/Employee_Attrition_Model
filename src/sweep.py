@@ -16,25 +16,25 @@ experiments = [
     },
     {
         "model_type": "random_forest",
-        "rf_n_estimators": 100,
-        "rf_max_depth": 10,
+        "rf_n_estimators": 30,
+        "rf_max_depth": 3,
     },
     {
         "model_type": "random_forest",
-        "rf_n_estimators": 200,
-        "rf_max_depth": 15,
+        "rf_n_estimators": 50,
+        "rf_max_depth": 3,
     },
     {
         "model_type": "gradient_boosting",
-        "gb_n_estimators": 150,
+        "gb_n_estimators": 30,
         "gb_learning_rate": 0.01,
-        "gb_max_depth": 7,
+        "gb_max_depth": 3,
     },
     {
         "model_type": "gradient_boosting",
-        "gb_n_estimators": 100,
+        "gb_n_estimators": 50,
         "gb_learning_rate": 0.1,
-        "gb_max_depth": 5,
+        "gb_max_depth": 3,
     },
 ]
 

@@ -22,9 +22,9 @@ config = {
 
     # Model-specific hyperparameters
     "lr_C": 1.0,                           # logistic regression regularization
-    "rf_n_estimators": 100,                # random forest number of trees
-    "rf_max_depth": None,                  # random forest max depth (None = unlimited)
-    "gb_n_estimators": 100,                # gradient boosting number of trees
+    "rf_n_estimators": 50,                # random forest number of trees
+    "rf_max_depth": 3,                  # random forest max depth (None = unlimited)
+    "gb_n_estimators": 50,                # gradient boosting number of trees
     "gb_learning_rate": 0.1,               # gradient boosting learning rate
     "gb_max_depth": 3,                     # gradient boosting max depth
 }
@@ -72,24 +72,27 @@ def build_model(config):
     """Create a model based on the config."""
 
     if config["model_type"] == "logistic_regression":
-        return LogisticRegression(
+        model = LogisticRegression(
             C=config["lr_C"],
             random_state=config["random_state"],
             max_iter=1000
         )
+        return model
     elif config["model_type"] == "random_forest":
-        return RandomForestClassifier(
+        model = RandomForestClassifier(
             n_estimators=config["rf_n_estimators"],
             max_depth=config["rf_max_depth"],
             random_state=config["random_state"]
         )
+        return model
     elif config["model_type"] == "gradient_boosting":
-        return GradientBoostingClassifier(
+        model = GradientBoostingClassifier(
             n_estimators=config["gb_n_estimators"],
             learning_rate=config["gb_learning_rate"],
             max_depth=config["gb_max_depth"],
             random_state=config["random_state"]
         )
+        return model
     else:
         raise ValueError(f"Unknown model type: {config['model_type']}")
 
@@ -166,7 +169,22 @@ def run_experiment(config):
         mlflow.log_metric("auc_roc", round(auc, 4))
 
         # ── Log the trained model as an artifact ──
-        mlflow.sklearn.log_model(model, "model")
+        # Log the model securely by explicitly trusting the sklearn Tree type
+        if config['model_type'] == "logistic_regression":
+            mlflow.sklearn.log_model(model, "model")
+        elif config["model_type"] == "random_forest":
+            ml.log_model(
+                sk_model= model,
+                name="random_forest",  # Replaced deprecated artifact_path with name
+                skops_trusted_types=["sklearn.tree._tree.Tree"]  # Authorizes the tree structure
+            )
+        else:
+            assert config["model_type"] == "gradient_boosting"
+            ml.log_model(
+                sk_model=model,
+                name="gradient_boosting",  # Replaced deprecated artifact_path with name
+                skops_trusted_types=["sklearn.tree._tree.Tree"]  # Authorizes the tree structure
+            )
 
         # ── Log the config file as an artifact for reference ──
         config_path = "config_snapshot.json"
