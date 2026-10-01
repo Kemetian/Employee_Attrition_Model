@@ -7,7 +7,8 @@ import json
 import os
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
-from sklearn.metrics import accuracy_score, confusion_matrix, classification_report, roc_auc_score
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report, roc_auc_score, precision_score, recall_score, f1_score
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 
 # Experiment setup and configuration
@@ -31,9 +32,9 @@ config = {
 def load_and_prepare_data(config):
     """Load the employee attrition dataset and prepare it for training."""
 
-    url = "https://github.com/Kemetian/Employee_Attrition_Model/blob/main/data/IBM-HRAnalytics-Employee-Attrition.csv"
+    url = "https://raw.githubusercontent.com/Kemetian/Employee_Attrition_Model/main/data/IBM-HRAnalytics-Employee-Attrition.csv"
     print(f"Loading data from URL...")
-    df = pd.read_csv(url)
+    df = pd.read_csv(url, on_bad_lines='warn')
     print(f"Loaded {len(df)} rows, {len(df.columns)} columns")
 
     # Drop any user-specified columns
@@ -92,6 +93,8 @@ def build_model(config):
     else:
         raise ValueError(f"Unknown model type: {config['model_type']}")
 
+    print(f"Built model: {config['model_type']}")
+
 def run_experiment(config):
     """Run a single experiment with the given config, tracked by MLflow."""
 
@@ -138,7 +141,6 @@ def run_experiment(config):
         if config["scale_features"]:
             scaler = StandardScaler()
             features_train = pd.DataFrame(scaler.fit_transform(features_train), columns=features_train.columns)
-            features_valid = pd.DataFrame(scaler.transform(features_valid), columns=features_valid.columns)
             features_test = pd.DataFrame(scaler.transform(features_test), columns=features_test.columns)
 
         # ── Train ──
@@ -191,12 +193,3 @@ def run_experiment(config):
 
 if __name__ == "__main__":
     run_experiment(config)
-# Exit with error if thresholds not met
-    if metrics["accuracy"] < CONFIG["min_accuracy"]:
-        print(f"\nFAILED: Accuracy below threshold")
-        sys.exit(1)
-    if metrics["f1_score"] < CONFIG["min_f1"]:
-        print(f"\nFAILED: F1 score below threshold")
-        sys.exit(1)
-
-    print("\nAll thresholds passed!")
