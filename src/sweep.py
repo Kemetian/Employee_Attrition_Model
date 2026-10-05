@@ -1,4 +1,5 @@
-from experiment import config as base_config, run_experiment
+from configs.model_config import config as base_config
+from evaluate import make_predictions
 
 # Define a list of experiments to try
 experiments = [
@@ -50,7 +51,7 @@ for i, overrides in enumerate(experiments):
     current_config.update(overrides)
 
     try:
-        run_id = run_experiment(current_config)
+        run_id = make_predictions(current_config)
         print(f"Completed. Run ID: {run_id}")
     except Exception as e:
         print(f"Failed: {e}")

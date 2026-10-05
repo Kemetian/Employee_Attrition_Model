@@ -1,6 +1,7 @@
 # Data and models
 models/
 metrics/
+data/
 
 # Python
 __pycache__/

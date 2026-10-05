@@ -1,0 +1,24 @@
+
+#Data location and target column
+data:
+  path: data/IBM-HRAnalytics-Employee-Attrition.csv
+  url: "https://raw.githubusercontent.com/Kemetian/Employee_Attrition_Model/main/data/IBM-HRAnalytics-Employee-Attrition.csv"
+  target_column: Attrition
+
+
+# Experiment setup and configuration
+model:
+  model_type: logistic_regression # logistic_regression, random_forest, gradient_boosting
+  test_size: 0.4
+  random_state: 42
+  handle_missing: drop # median, drop
+  scale_features: true
+  features_to_drop: [EmployeeNumber, EmployeeCount, StandardHours]
+
+  # Model-specific hyperparameters
+  lr_C: 1.0
+  rf_n_estimators: 50
+  rf_max_depth: 3 # null means unlimited
+  gb_n_estimators: 50
+  gb_learning_rate: 0.1
+  gb_max_depth: 3
