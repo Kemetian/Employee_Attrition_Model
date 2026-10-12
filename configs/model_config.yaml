@@ -2,7 +2,7 @@
 #Data location and target column
 data:
   path: data/IBM-HRAnalytics-Employee-Attrition.csv
-  url: "https://raw.githubusercontent.com/Kemetian/Employee_Attrition_Model/main/data/IBM-HRAnalytics-Employee-Attrition.csv"
+  #url: "https://raw.githubusercontent.com/Kemetian/Employee_Attrition_Model/main/data/IBM-HRAnalytics-Employee-Attrition.csv"
   target_column: Attrition
 
 

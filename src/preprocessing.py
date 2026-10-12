@@ -1,5 +1,7 @@
 import pandas as pd
 import numpy as np
+import yaml
+from sklearn.preprocessing import MinMaxScaler, LabelEncoder
 
 def fill_missing_with_median(df, columns):
     """Fill missing values in specified columns with the column median."""
@@ -88,3 +90,17 @@ def remove_outliers(df, column, method="iqr", threshold=1.5):
         raise ValueError(f"Unknown method: {method}")
 
     return df
+
+def encode_categorical_column(df, column_name):
+    """Encodes a categorical column using LabelEncoder and returns the DataFrame and the encoder."""
+    df = df.copy()
+    if column_name in df.columns:
+        le = LabelEncoder()
+        df[column_name] = le.fit_transform(df[column_name].astype(str))
+        return df, le
+    return df, None
+
+def load_config(config_path="configs/model_config.yaml"):
+    """Safely loads model and pipeline configurations from a YAML file."""
+    with open(config_path, "r") as f:
+        return yaml.safe_load(f)

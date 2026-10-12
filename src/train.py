@@ -1,32 +1,28 @@
-from pdb import run
-
-import pandas as pd
+import os
+import sys
+import yaml
 import numpy as np
+import pandas as pd
 import mlflow
 import mlflow.sklearn as ml
-import sys
-import json
-import os
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler, LabelEncoder
-import yaml
-from configs.model_config import config
-from evaluate import make_predictions
 
-def load_config(model_config: str) -> dict:
+# Import the decoupled evaluation function
+from src.evaluate import make_predictions
+
+def load_config(model_config_path: str = "configs/model_config.yaml") -> dict:
     """Reads and parses the YAML configuration file."""
-    with open(model_config, "r") as file:
-        config = yaml.safe_load(file)
-    return config
+    with open(model_config_path, "r") as file:
+        return yaml.safe_load(file)
 
 def load_and_prepare_data(config):
     """Load the employee attrition dataset and prepare it for training."""
-
-    url = config["data"]["url"]
-    print(f"Loading data from URL...")
-    df = pd.read_csv(url, on_bad_lines='warn')
+    path = config["data"]["path"]
+    print(f"Loading data from path: {path}")
+    df = pd.read_csv(path, on_bad_lines='warn')
     print(f"Loaded {len(df)} rows, {len(df.columns)} columns")
 
     # Drop any user-specified columns
@@ -46,13 +42,11 @@ def load_and_prepare_data(config):
         df = df.dropna()
         print(f"Dropped rows with missing values: {before} -> {len(df)}")
 
-    # Encode categorical columns
-    categorical_cols = df.select_dtypes(include=["string"]).columns.tolist()
-    label_encoders = {}
+    # Encode categorical columns (handles both 'object' and 'string' types safely)
+    categorical_cols = df.select_dtypes(include=["object", "category", "string"]).columns.tolist()
     for col in categorical_cols:
         le = LabelEncoder()
         df[col] = le.fit_transform(df[col].astype(str))
-        label_encoders[col] = le
 
     # Separate features and target
     features = df.drop(columns=[config["data"]["target_column"]])
@@ -62,41 +56,40 @@ def load_and_prepare_data(config):
 
 def build_model(config):
     """Create a model based on the config."""
+    model_type = config["model"]["model_type"]
+    print(f"Building model: {model_type}")
 
-    if config["model"]["model_type"] == "logistic_regression":
-        model = LogisticRegression(
+    if model_type == "logistic_regression":
+        return LogisticRegression(
             C=config["model"]["lr_C"],
             random_state=config["model"]["random_state"],
             max_iter=1000
         )
-        return model
-    elif config["model"]["model_type"] == "random_forest":
-        model = RandomForestClassifier(
+    elif model_type == "random_forest":
+        return RandomForestClassifier(
             n_estimators=config["model"]["rf_n_estimators"],
             max_depth=config["model"]["rf_max_depth"],
             random_state=config["model"]["random_state"]
         )
-        return model
-    elif config["model"]["model_type"] == "gradient_boosting":
-        model = GradientBoostingClassifier(
+    elif model_type == "gradient_boosting":
+        return GradientBoostingClassifier(
             n_estimators=config["model"]["gb_n_estimators"],
             learning_rate=config["model"]["gb_learning_rate"],
             max_depth=config["model"]["gb_max_depth"],
             random_state=config["model"]["random_state"]
         )
-        return model
     else:
-        raise ValueError(f"Unknown model type: {config['model']['model_type']}")
+        raise ValueError(f"Unknown model type: {model_type}")
 
-    print(f"Built model: {config['model']['model_type']}")
-
-def train_model(config):
-    """Train the built model, tracked by MLflow."""
+def train_pipeline(config_path="configs/model_config.yaml"):
+    """Full execution pipeline: Load config, prepare data, train model, and evaluate."""
+    # 1. Dynamically read configuration mapping
+    config = load_config(config_path)
 
     # Set the experiment name so all runs are grouped together
     mlflow.set_experiment("employee-attrition-prediction")
 
-    # Start an MLflow run
+    # Start an MLflow active run context
     with mlflow.start_run():
 
         # ── Log all configuration as parameters ──
@@ -105,7 +98,8 @@ def train_model(config):
         mlflow.log_param("random_state", config["model"]["random_state"])
         mlflow.log_param("handle_missing", config["model"]["handle_missing"])
         mlflow.log_param("scale_features", config["model"]["scale_features"])
-        mlflow.log_param("features_dropped", str(config["model"]["features_to_drop"]))
+        # Fixed look-up error from config["model"] to config["data"]
+        mlflow.log_param("features_dropped", str(config["data"].get("features_to_drop", [])))
 
         # Log model-specific hyperparameters based on model type
         if config["model"]["model_type"] == "logistic_regression":
@@ -144,25 +138,27 @@ def train_model(config):
         trained_model = model.fit(features_train, target_train)
 
         # ── Log the trained model as an artifact ──
-        # Log the model securely by explicitly trusting the sklearn Tree type
         if config['model']['model_type'] == "logistic_regression":
-            mlflow.sklearn.log_model(model, "model")
+            ml.log_model(sk_model=trained_model, name="logistic_regression")
         elif config["model"]["model_type"] == "random_forest":
             ml.log_model(
-                sk_model= model,
-                name="random_forest",  # Replaced deprecated artifact_path with name
-                skops_trusted_types=["sklearn.tree._tree.Tree"]  # Authorizes the tree structure
+                sk_model=trained_model,
+                name="random_forest",
+                skops_trusted_types=["sklearn.tree._tree.Tree"]
             )
         else:
-            assert config["model"]["model_type"] == "gradient_boosting"
             ml.log_model(
-                sk_model=model,
-                name="gradient_boosting",  # Replaced deprecated artifact_path with name
-                skops_trusted_types=["sklearn.tree._tree.Tree"]  # Authorizes the tree structure
+                sk_model=trained_model,
+                name="gradient_boosting",
+                skops_trusted_types=["sklearn.tree._tree.Tree"]
             )
 
         print(f"Finished training {config['model']['model_type']}.")
-    return trained_model
+
+        # ── Evaluate ──
+        # Pass variables directly to break circular imports cleanly
+        make_predictions(config, trained_model, features_test, target_test)
 
 if __name__ == "__main__":
-    make_predictions()
+    # Execute the unified, end-to-end training pipeline sequence
+    train_pipeline()

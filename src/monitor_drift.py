@@ -7,8 +7,9 @@ import os
 
 import numpy as np
 import pandas as pd
-from data.dataset import hr_analytics_df
-from configs.model_config import data
+
+# Import valid YAML config loader from your preprocessing utility
+from src.preprocessing import load_config
 
 # Import Evidently core Report engine and the Data Drift metric preset
 from evidently.report import Report
@@ -22,8 +23,8 @@ class DriftReport:
     drift_detected: bool
 
 def monitor_drift(
-    reference: pd.DataFrame = hr_analytics_df,
-    current: pd.DataFrame = pd.read_csv(data["url"]),
+    reference: pd.DataFrame | None = None,
+    current: pd.DataFrame | None = None,
     *,
     alpha: float = 0.05,
     features: list[str] | None = None,
@@ -32,6 +33,24 @@ def monitor_drift(
     Test shared feature distributions for statistically significant drift using Evidently AI.
     Generates interactive HTML assets and exposes structural dataset-level evaluations.
     """
+    # ── Load Configuration and Data Sources Dynamically ──
+    if reference is None or current is None:
+        config = load_config("configs/model_config.yaml")
+        data_path = config["data"]["path"]
+
+        if not os.path.exists(data_path):
+            raise FileNotFoundError(f"Dataset not found at configured path: {data_path}")
+
+        print(f"Loading master dataset from: {data_path}")
+        df = pd.read_csv(data_path, on_bad_lines='warn')
+
+        # Split the dataset 50/50 to simulate Reference (Historical) vs Current (Production Logs)
+        midpoint = len(df) // 2
+        if reference is None:
+            reference = df.iloc[:midpoint].copy()
+        if current is None:
+            current = df.iloc[midpoint:].copy()
+
     if not isinstance(reference, pd.DataFrame) or not isinstance(current, pd.DataFrame):
         raise TypeError("reference and current must be pandas DataFrames")
     if not 0 < alpha < 1:
@@ -42,12 +61,11 @@ def monitor_drift(
         reference.columns.intersection(current.columns)
     )
 
-    missing = [feature for feature in selected if feature not in reference or feature not in current]
+    missing = [feature for feature in selected if feature not in reference.columns or feature not in current.columns]
     if missing:
         raise ValueError(f"Features missing from one or both data frames: {missing}")
 
     # Build and compute an automated structured report using Evidently presets
-    # Stat tests are selected dynamically based on sample size and column data types
     drift_report_engine = Report(metrics=[DataDriftPreset(columns=selected)])
     drift_report_engine.run(reference_data=reference, current_data=current)
 
@@ -71,7 +89,7 @@ def monitor_drift(
             "feature": feature_name,
             "test": info["stattest_name"],
             "statistic": info["drift_score"],
-            "p_value": info.get("p_value", np.nan),  # Some tests like Wasserstein don't return p-values
+            "p_value": info.get("p_value", np.nan),  # Safe handling for metrics without p-values
             "drift_detected": bool(is_drifted),
         })
 
@@ -94,5 +112,10 @@ def monitor_drift(
 if __name__ == "__main__":
     print("Running integrated Evidently drift monitor pipeline...")
     # Executing the code will generate your structured matrix and output file
-    # report = monitor_drift()
-    # print(f"Drift Detected: {report.drift_detected}")
+    report = monitor_drift()
+    print(f"\n===== Production Monitoring Summary =====")
+    print(f"Dataset-level Drift Detected: {report.drift_detected}")
+    print(f"Number of Drifted Features:   {len(report.drifted_features)}")
+    if report.drifted_features:
+        print(f"Drifted Feature List:         {report.drifted_features}")
+    print(f"=========================================")

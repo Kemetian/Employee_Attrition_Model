@@ -1,7 +1,7 @@
 # Data and models
 models/
 metrics/
-data/
+
 # Allow Git to track DVC pointer files even if data folders are ignored
 !*.dvc
 

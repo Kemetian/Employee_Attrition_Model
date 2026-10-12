@@ -25,3 +25,4 @@ Operation instructions: Set desired configuration(s) in src/sweep.py. Run sweep.
         1. **Trigger Automated Re-training**: Re-run `src/experiment.py` utilizing an expanded training window that includes the newly acquired DVC-tracked dataset to capture current distribution variances.
         2. **Review Feature Preprocessing Bounds**: Inspect outlier handling and binning transformations for structural skew within `src/evaluation.py`.
         3. **Establish Alert Thresholds**: Wire the `DriftReport` flags directly into our MLflow runtime to automatically stop automated deployments if a dataset-level drift threshold (p-value < 0.05) is breached.
+
